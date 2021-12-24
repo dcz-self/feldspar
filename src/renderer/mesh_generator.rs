@@ -9,7 +9,7 @@ use crate::{
 use building_blocks::{
     mesh::*,
     prelude::{
-        Array3x2, ChunkKey3, IndexedArray, IsEmpty, Local, Point3i, Sd8, Stride, TransformMap,
+        Array3x1, Array3x2, ChunkKey3, IndexedArray, IsEmpty, Local, Point3i, Sd8, Stride, TransformMap,
     },
     storage::access_traits::*,
     storage::SmallKeyHashMap,
@@ -107,7 +107,7 @@ fn generate_mesh_for_each_chunk(
         for chunk_min in dirty_chunks.dirty_chunk_mins().iter().cloned() {
             let chunk_key = ChunkKey3::new(0, chunk_min);
             s.spawn(async move {
-                let padded_chunk_extent = padded_surface_nets_chunk_extent(
+                let padded_chunk_extent = padded_greedy_quads_chunk_extent(
                     &voxel_map
                         .voxels
                         .indexer
@@ -118,49 +118,63 @@ fn generate_mesh_for_each_chunk(
                 let mut mesh_buffers = mesh_tls
                     .get_or_create_with(|| {
                         RefCell::new(MeshBuffers {
-                            padded_chunk: ambient_sdf_array(padded_chunk_extent),
-                            surface_nets_buffer: Default::default(),
+                            padded_chunk: Array3x1::fill(padded_chunk_extent, VoxelType(0)),
+                            greedy_quads_buffer: GreedyQuadsBuffer::new(
+                                padded_chunk_extent,
+                                RIGHT_HANDED_Y_UP_CONFIG.quad_groups(),
+                            ),
                         })
                     })
                     .borrow_mut();
 
                 let MeshBuffers {
                     padded_chunk,
-                    surface_nets_buffer,
+                    greedy_quads_buffer,
                 } = &mut *mesh_buffers;
 
                 padded_chunk.set_minimum(padded_chunk_extent.minimum);
+                let lod_view = voxel_map.voxels.lod_view(0);
+                let voxels = TransformMap::new(&lod_view, |(type_, _dist)| type_);
 
                 copy_extent(
                     &padded_chunk_extent,
-                    &voxel_map.voxels.lod_view(0),
+                    &voxels,
                     padded_chunk,
                 );
 
-                let padded_sdf_chunk = TransformMap::new(padded_chunk, |(_type, dist)| dist);
+                let padded_greedy_chunk = padded_chunk;
 
-                surface_nets(
-                    &padded_sdf_chunk,
+                greedy_quads(
+                    padded_greedy_chunk,
                     &padded_chunk_extent,
-                    1.0,
-                    true,
-                    &mut *surface_nets_buffer,
+                    &mut *greedy_quads_buffer,
                 );
 
-                if surface_nets_buffer.mesh.indices.is_empty() {
+                let mut mesh = PosNormMesh::default();
+                for group in greedy_quads_buffer.quad_groups.iter() {
+                    for quad in group.quads.iter() {
+                        group.face.add_quad_to_pos_norm_mesh(&quad, 1.0, &mut mesh);
+                    }
+                }
+                // FIXME: select the actual material in use
+                let materials = (0..(mesh.positions.len())).map(|_| [1, 0, 0, 0]).collect();
+                (chunk_key, Some((mesh.clone(), materials)))
+/*
+                if mesh.indices.is_empty() {
                     (chunk_key, None)
                 } else {
                     // Count materials adjacent to each vertex for texture blending.
+                    // FIXME: probably unneeded
                     let info_map =
                         TransformMap::new(padded_chunk, voxel_map.voxel_info_transform());
                     let material_counts =
-                        count_adjacent_materials(&info_map, &surface_nets_buffer.surface_strides);
+                        count_adjacent_materials(&info_map, &greedy_quads_buffer.surface_strides);
 
                     (
                         chunk_key,
-                        Some((surface_nets_buffer.mesh.clone(), material_counts)),
+                        Some((greedy_quads_buffer.mesh.clone(), material_counts)),
                     )
-                }
+                }*/
             })
         }
     })
@@ -200,8 +214,9 @@ where
 type ThreadLocalMeshBuffers = ThreadLocalResource<RefCell<MeshBuffers>>;
 
 pub struct MeshBuffers {
-    surface_nets_buffer: SurfaceNetsBuffer,
-    padded_chunk: Array3x2<VoxelType, Sd8>,
+    //surface_nets_buffer: SurfaceNetsBuffer,
+    greedy_quads_buffer: GreedyQuadsBuffer,
+    padded_chunk: Array3x1<VoxelType>,
 }
 
 fn create_voxel_mesh_bundle(

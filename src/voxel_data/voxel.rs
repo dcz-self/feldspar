@@ -1,5 +1,7 @@
 use crate::prelude::{MaterialLayer, MaterialVoxel};
 
+use building_blocks::mesh::{IsOpaque, MergeVoxel };
+
 use building_blocks::storage::{prelude::Sd8, IsEmpty};
 use bytemuck::{Pod, Zeroable};
 use serde::{Deserialize, Serialize};
@@ -13,6 +15,26 @@ unsafe impl Pod for VoxelType {}
 
 impl VoxelType {
     pub const EMPTY: Self = VoxelType(0);
+}
+
+impl MergeVoxel for VoxelType {
+    type VoxelValue = u8;
+
+    fn voxel_merge_value(&self) -> u8 {
+        self.0
+    }
+}
+
+impl IsOpaque for VoxelType {
+    fn is_opaque(&self) -> bool {
+        true
+    }
+}
+
+impl IsEmpty for VoxelType {
+    fn is_empty(&self) -> bool {
+        *self == VoxelType::EMPTY
+    }
 }
 
 pub const EMPTY_SIGNED_DISTANCE: Sd8 = Sd8::ONE;
