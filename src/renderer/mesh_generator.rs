@@ -162,22 +162,6 @@ fn generate_mesh_for_each_chunk(
                 }
 
                 (chunk_key, Some((mesh.clone(), materials)))
-/*
-                if mesh.indices.is_empty() {
-                    (chunk_key, None)
-                } else {
-                    // Count materials adjacent to each vertex for texture blending.
-                    // FIXME: probably unneeded
-                    let info_map =
-                        TransformMap::new(padded_chunk, voxel_map.voxel_info_transform());
-                    let material_counts =
-                        count_adjacent_materials(&info_map, &greedy_quads_buffer.surface_strides);
-
-                    (
-                        chunk_key,
-                        Some((greedy_quads_buffer.mesh.clone(), material_counts)),
-                    )
-                }*/
             })
         }
     })
