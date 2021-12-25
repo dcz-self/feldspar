@@ -151,13 +151,16 @@ fn generate_mesh_for_each_chunk(
                 );
 
                 let mut mesh = PosNormMesh::default();
+                let mut materials = Vec::new();
                 for group in greedy_quads_buffer.quad_groups.iter() {
                     for quad in group.quads.iter() {
                         group.face.add_quad_to_pos_norm_mesh(&quad, 1.0, &mut mesh);
+                        let material = to_material(&voxel_map, padded_greedy_chunk.get(quad.minimum));
+                        // Four copies of the material, for each corner of the quad
+                        materials.extend_from_slice(&[material, material, material, material]);
                     }
                 }
-                // FIXME: select the actual material in use
-                let materials = (0..(mesh.positions.len())).map(|_| [1, 0, 0, 0]).collect();
+
                 (chunk_key, Some((mesh.clone(), materials)))
 /*
                 if mesh.indices.is_empty() {
@@ -178,6 +181,13 @@ fn generate_mesh_for_each_chunk(
             })
         }
     })
+}
+
+fn to_material(world: &SdfVoxelMap, v: VoxelType) -> [u8; 4] {
+    let mut materials = [0; 4];
+    let info = world.palette.get_voxel_type_info(v);
+    materials[info.material().0 as usize] = 1;
+    materials
 }
 
 /// Uses a kernel to count the adjacent materials for each surface point. This is necessary because we used dual contouring to
