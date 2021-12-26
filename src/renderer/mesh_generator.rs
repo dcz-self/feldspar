@@ -9,7 +9,7 @@ use crate::{
 use building_blocks::{
     mesh::*,
     prelude::{
-        Array3x1, Array3x2, ChunkKey3, IndexedArray, IsEmpty, Local, Point3i, Sd8, Stride, TransformMap,
+        Array3x1, ChunkKey3, IndexedArray, IsEmpty, Local, Point3i, Stride, TransformMap,
     },
     storage::access_traits::*,
     storage::SmallKeyHashMap,
@@ -26,6 +26,26 @@ use bevy::{
     tasks::ComputeTaskPool,
 };
 use std::cell::RefCell;
+use std::cmp;
+
+
+/// Do not render anything above this level.
+/// It could also be f32, to operate on world coords,
+/// but it's easier to use voxel coords.
+#[derive(PartialEq, Clone, Copy)]
+pub struct MeshCutoff(pub i32);
+
+impl MeshCutoff {
+    pub fn nothing() -> Self {
+        MeshCutoff(i32::MAX)
+    }
+}
+
+impl Default for MeshCutoff {
+    fn default() -> Self {
+        MeshCutoff(i32::MAX)
+    }
+}
 
 // TODO: make a collection of textures for different attributes (albedo, normal, metal, rough, emmisive, etc)
 #[derive(Default)]
@@ -47,10 +67,13 @@ impl<S> MeshGeneratorPlugin<S> {
 
 impl<S: BevyState> Plugin for MeshGeneratorPlugin<S> {
     fn build(&self, app: &mut AppBuilder) {
-        app.insert_resource(ChunkMeshes::default()).add_system_set(
-            SystemSet::on_update(self.update_state.clone())
-                .with_system(mesh_generator_system.system()),
-        );
+        app
+            .insert_resource(ChunkMeshes::default())
+            .insert_resource(MeshCutoff::nothing())
+            .add_system_set(
+                SystemSet::on_update(self.update_state.clone())
+                    .with_system(mesh_generator_system.system()),
+            );
     }
 }
 
@@ -58,6 +81,7 @@ impl<S: BevyState> Plugin for MeshGeneratorPlugin<S> {
 pub struct ChunkMeshes {
     // Map from chunk key to mesh entity.
     entities: SmallKeyHashMap<ChunkKey3, Entity>,
+    used_cutoff: MeshCutoff,
 }
 
 /// Generates new meshes for all dirty chunks.
@@ -66,14 +90,29 @@ fn mesh_generator_system(
     pool: Res<ComputeTaskPool>,
     voxel_map: Res<SdfVoxelMap>,
     dirty_chunks: Res<DirtyChunks>,
+    cutoff_height: Res<MeshCutoff>,
     local_mesh_buffers: ecs::system::Local<ThreadLocalMeshBuffers>,
     mesh_material: Res<MeshMaterial>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut chunk_meshes: ResMut<ChunkMeshes>,
 ) {
-    let new_chunk_meshes =
-        generate_mesh_for_each_chunk(&*voxel_map, &*dirty_chunks, &*local_mesh_buffers, &*pool);
+    let all_chunks =
+        if *cutoff_height == chunk_meshes.used_cutoff {
+            None
+        } else {
+            println!("cutoff new: {} old {}", cutoff_height.0, chunk_meshes.used_cutoff.0);
+            let keys = voxel_map.voxels.get_chunk_keys();
+            Some(DirtyChunks::new(keys.as_slice()))
+        };
 
+    let new_chunk_meshes = generate_mesh_for_each_chunk(
+        &*voxel_map,
+        all_chunks.as_ref().unwrap_or(&*dirty_chunks),
+        &*cutoff_height,
+        &*local_mesh_buffers,
+        &*pool,
+    );
+    chunk_meshes.used_cutoff = *cutoff_height;
     for (chunk_key, item) in new_chunk_meshes.into_iter() {
         let old_mesh = if let Some((mesh, material_counts)) = item {
             log::debug!("Creating chunk mesh for {:?}", chunk_key);
@@ -100,6 +139,7 @@ fn mesh_generator_system(
 fn generate_mesh_for_each_chunk(
     voxel_map: &SdfVoxelMap,
     dirty_chunks: &DirtyChunks,
+    cutoff_height: &MeshCutoff,
     local_mesh_buffers: &ThreadLocalMeshBuffers,
     pool: &ComputeTaskPool,
 ) -> Vec<(ChunkKey3, Option<(PosNormMesh, Vec<[u8; 4]>)>)> {
@@ -134,10 +174,30 @@ fn generate_mesh_for_each_chunk(
 
                 padded_chunk.set_minimum(padded_chunk_extent.minimum);
                 let lod_view = voxel_map.voxels.lod_view(0);
+                //let voxels = TransformIndexMap::new(&lod_view, |(type_, _dist), _coord| type_);
                 let voxels = TransformMap::new(&lod_view, |(type_, _dist)| type_);
 
+                // Poor man's filter
+                let mut truncated_chunk_extent = padded_chunk_extent.clone();
+                *truncated_chunk_extent.shape.y_mut()
+                    = cmp::max(
+                        cmp::min(
+                            truncated_chunk_extent.shape.y() + truncated_chunk_extent.minimum.y(),
+                            cutoff_height.0
+                        )
+                        - truncated_chunk_extent.minimum.y(),
+                        0,
+                    );
+
+                if truncated_chunk_extent.shape.y() <= 0 {
+                    return (chunk_key, None);
+                }
+
+                println!("Padded {:?}", padded_chunk_extent);
+                println!("Truncaeted {:?}", truncated_chunk_extent);
                 copy_extent(
-                    &padded_chunk_extent,
+                    &truncated_chunk_extent,
+                    //&padded_chunk_extent,
                     &voxels,
                     padded_chunk,
                 );

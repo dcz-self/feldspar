@@ -168,6 +168,18 @@ pub struct DirtyChunks {
 }
 
 impl DirtyChunks {
+    pub fn new(chunks: &[&ChunkKey<[i32; 3]>]) -> Self {
+        DirtyChunks {
+            changed_chunk_mins: Vec::new(),
+            dirty_chunk_mins: {
+                let mut dirty_chunk_mins = SmallKeyHashSet::new();
+                for chunk_key in chunks {
+                    dirty_chunk_mins.insert(chunk_key.minimum);
+                }
+                dirty_chunk_mins
+            },
+        }
+    }
     pub fn changed_chunk_mins(&self) -> &[Point3i] {
         &self.changed_chunk_mins
     }
