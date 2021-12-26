@@ -9,7 +9,7 @@ use crate::{
 use building_blocks::{
     mesh::*,
     prelude::{
-        Array3x1, ChunkKey3, IndexedArray, IsEmpty, Local, Point3i, Stride, TransformMap,
+        Array3x1, ChunkKey3, IndexedArray, IsEmpty, Local, Point3i, PointN, Stride, TransformMap,
     },
     storage::access_traits::*,
     storage::SmallKeyHashMap,
@@ -84,6 +84,8 @@ pub struct ChunkMeshes {
     used_cutoff: MeshCutoff,
 }
 
+pub struct ChunkMesh;
+
 /// Generates new meshes for all dirty chunks.
 fn mesh_generator_system(
     mut commands: Commands,
@@ -125,12 +127,14 @@ fn mesh_generator_system(
                         mesh_material.0.clone(),
                         &mut *meshes,
                     ))
+                    .insert(ChunkMesh)
                     .id(),
             )
         } else {
             chunk_meshes.entities.remove(&chunk_key)
         };
         if let Some(old_mesh) = old_mesh {
+            log::debug!("Despawning chunk mesh {:?}", old_mesh);
             commands.entity(old_mesh).despawn();
         }
     }
@@ -174,33 +178,40 @@ fn generate_mesh_for_each_chunk(
 
                 padded_chunk.set_minimum(padded_chunk_extent.minimum);
                 let lod_view = voxel_map.voxels.lod_view(0);
+                // This would have been so nice! But copy_extent flops hard on WriteExtent.
+                // Why is WriteExtent coupled with the implementation of ReadExtent?
                 //let voxels = TransformIndexMap::new(&lod_view, |(type_, _dist), _coord| type_);
                 let voxels = TransformMap::new(&lod_view, |(type_, _dist)| type_);
 
-                // Poor man's filter
-                let mut truncated_chunk_extent = padded_chunk_extent.clone();
-                *truncated_chunk_extent.shape.y_mut()
-                    = cmp::max(
-                        cmp::min(
-                            truncated_chunk_extent.shape.y() + truncated_chunk_extent.minimum.y(),
-                            cutoff_height.0
-                        )
-                        - truncated_chunk_extent.minimum.y(),
-                        0,
-                    );
+                let ChunkKey3{minimum: PointN([x, y, z]), ..} = chunk_key;
 
-                if truncated_chunk_extent.shape.y() <= 0 {
-                    return (chunk_key, None);
-                }
-
-                println!("Padded {:?}", padded_chunk_extent);
-                println!("Truncaeted {:?}", truncated_chunk_extent);
                 copy_extent(
-                    &truncated_chunk_extent,
-                    //&padded_chunk_extent,
+                    &padded_chunk_extent,
                     &voxels,
                     padded_chunk,
                 );
+
+                // Poor man's filter
+                let mut cleared_chunk_extent = padded_chunk_extent.clone();
+                let padded_top = padded_chunk_extent.shape.y() + padded_chunk_extent.minimum.y();
+                // Never to allow the offset to be at infinity.
+                // At the same time, don't start at negative infinity.
+                *cleared_chunk_extent.minimum.y_mut() = cmp::max(
+                    cmp::min(cutoff_height.0, padded_top),
+                    padded_chunk_extent.minimum.y(),
+                );
+                *cleared_chunk_extent.shape.y_mut()
+                    = padded_top - cleared_chunk_extent.minimum.y();
+
+                if cleared_chunk_extent.shape.y() > 0 {
+                    let clear_voxels = Array3x1::fill(cleared_chunk_extent, VoxelType(0));
+
+                    copy_extent(
+                        &cleared_chunk_extent,
+                        &clear_voxels,
+                        padded_chunk,
+                    );
+                }
 
                 let padded_greedy_chunk = padded_chunk;
 
