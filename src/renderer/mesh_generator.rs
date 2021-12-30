@@ -284,7 +284,7 @@ pub struct MeshBuffers {
     padded_chunk: Array3x1<VoxelType>,
 }
 
-fn create_voxel_mesh_bundle(
+pub fn create_voxel_mesh_bundle(
     mesh: PosNormMesh,
     material_counts: Vec<[u8; 4]>,
     material: Handle<ArrayMaterial>,
