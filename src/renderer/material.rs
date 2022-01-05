@@ -2,6 +2,9 @@ use bevy::asset::Handle;
 use bevy::reflect::TypeUuid;
 use bevy::render::{color::Color, renderer::RenderResources, shader::ShaderDefs, texture::Texture};
 
+use crate::prelude::VoxelRenderAssets;
+
+
 /// A material with "standard" properties used in PBR lighting
 /// Standard property values with pictures here <https://google.github.io/filament/Material%20Properties.pdf>
 #[derive(Debug, RenderResources, ShaderDefs, TypeUuid)]
@@ -60,10 +63,11 @@ impl From<Color> for ArrayMaterial {
     }
 }
 
-impl From<Handle<Texture>> for ArrayMaterial {
-    fn from(texture: Handle<Texture>) -> Self {
+impl From<VoxelRenderAssets> for ArrayMaterial {
+    fn from(texture: VoxelRenderAssets) -> Self {
+        assert_eq!(texture.image_count, 4);
         ArrayMaterial {
-            base_color_texture: Some(texture),
+            base_color_texture: Some(texture.mesh_base_color),
             ..Default::default()
         }
     }

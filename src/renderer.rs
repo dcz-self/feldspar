@@ -80,3 +80,12 @@ impl<S: BevyState> Plugin for VoxelRenderPlugin<S> {
 pub struct RenderConfig {
     pub debug_chunk_boundaries: bool,
 }
+
+fn on_finished_loading(
+    assets: Res<VoxelRenderAssets>,
+    mut commands: Commands,
+    mut array_materials: ResMut<Assets<ArrayMaterial>>,
+    mut textures: ResMut<Assets<Texture>>,
+) {
+    spawn_array_material::<MeshMaterial>(&*assets, commands, array_materials, textures)
+}

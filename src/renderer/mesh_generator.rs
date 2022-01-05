@@ -51,6 +51,12 @@ impl Default for MeshCutoff {
 #[derive(Default)]
 pub struct MeshMaterial(pub Handle<ArrayMaterial>);
 
+impl From<Handle<ArrayMaterial>> for MeshMaterial {
+    fn from(v: Handle<ArrayMaterial>) -> Self {
+        Self(v)
+    }
+}
+
 /// Generates smooth meshes for voxel chunks. When a chunk becomes dirty, its old mesh is replaced with a newly generated one.
 ///
 /// **NOTE**: Expects the `MeshMaterial` resource to exist before running. You should specify the state `S` when things have
