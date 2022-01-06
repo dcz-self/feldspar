@@ -34,7 +34,9 @@ pub fn spawn_array_material<T: From<Handle<ArrayMaterial>> + Send + Sync + 'stat
 }
 
 fn handle_loaded_array_texture(texture: &mut Texture, num_layers: u32) {
-    texture.reinterpret_stacked_2d_as_array(num_layers);
+    if texture.size.depth != num_layers {
+        texture.reinterpret_stacked_2d_as_array(num_layers);
+    }
     texture.sampler.address_mode_u = AddressMode::Repeat;
     texture.sampler.address_mode_v = AddressMode::Repeat;
 }
