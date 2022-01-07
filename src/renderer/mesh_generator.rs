@@ -290,6 +290,7 @@ pub struct MeshBuffers {
     padded_chunk: Array3x1<VoxelType>,
 }
 
+/// Creates a bundle to render with the voxel pipeline.
 pub fn create_voxel_mesh_bundle(
     mesh: PosNormMesh,
     material_counts: Vec<[u8; 4]>,

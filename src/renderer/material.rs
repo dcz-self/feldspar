@@ -7,6 +7,7 @@ use crate::prelude::VoxelRenderAssets;
 
 /// A material with "standard" properties used in PBR lighting
 /// Standard property values with pictures here <https://google.github.io/filament/Material%20Properties.pdf>
+/// Uses a texture with 4 layers as `base_color_texture`.
 #[derive(Debug, RenderResources, ShaderDefs, TypeUuid)]
 #[uuid = "42b444f8-9a77-4e53-9075-863f43f66b9e"]
 pub struct ArrayMaterial {
@@ -63,15 +64,6 @@ impl From<Color> for ArrayMaterial {
     }
 }
 
-impl From<VoxelRenderAssets> for ArrayMaterial {
-    fn from(texture: VoxelRenderAssets) -> Self {
-        assert_eq!(texture.image_count, 4);
-        ArrayMaterial {
-            base_color_texture: Some(texture.mesh_base_color),
-            ..Default::default()
-        }
-    }
-}
 
 /// The layer index into an `ArrayMaterial`.
 #[derive(Clone, Copy, Eq, PartialEq)]

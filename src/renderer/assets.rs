@@ -8,6 +8,8 @@ use bevy::{
 
 /// The set of assets needed by the renderer. This resource must exist and all asset handles must have finished loading before
 /// entering the update state configured by `VoxelWorldPlugin::new`.
+///
+/// In practice, this is a single texture and only used to define parameters to `spawn_aray_material`.
 #[derive(Clone)]
 pub struct VoxelRenderAssets {
     /// A 2D texture containing vertically stacked images of the same size. Each image corresponds to one voxel type.
@@ -15,6 +17,18 @@ pub struct VoxelRenderAssets {
     pub image_count: u32,
 }
 
+impl From<VoxelRenderAssets> for ArrayMaterial {
+    fn from(texture: VoxelRenderAssets) -> Self {
+        assert_eq!(texture.image_count, 4);
+        ArrayMaterial {
+            base_color_texture: Some(texture.mesh_base_color),
+            ..Default::default()
+        }
+    }
+}
+
+/// Convenience method: creates an ArrayMaterial and reformats its texture
+/// to be compatible with `renderer::create_voxel_mesh_bundle`.
 pub fn spawn_array_material<T: From<Handle<ArrayMaterial>> + Send + Sync + 'static>(
     assets: &VoxelRenderAssets,
     mut commands: Commands,
