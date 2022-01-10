@@ -44,7 +44,7 @@ impl<S> VoxelRenderPlugin<S> {
 impl<S: BevyState> Plugin for VoxelRenderPlugin<S> {
     fn build(&self, app: &mut AppBuilder) {
         app.add_plugin(DebugLinesPlugin)
-            .add_plugin(MeshGeneratorPlugin::new(self.update_state.clone()))
+            //.add_plugin(MeshGeneratorPlugin::new(self.update_state.clone()))
             .add_system_set(
                 SystemSet::on_enter(self.update_state.clone())
                     .with_system(on_finished_loading.system()),

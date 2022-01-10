@@ -24,8 +24,8 @@ bevy = { version = "0.5", optional = true, default-features = false }
 feldspar-core = { path = "../feldspar-core/", version = "0.1" }
 
 [dependencies.ndshape]
-git = "https://github.com/dcz-self/ndshape-rs"
-rev = "82e25b6"
+git = "https://github.com/bonsairobo/ndshape-rs"
+rev = "d184932"
 
 
 [dev-dependencies]
