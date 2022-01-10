@@ -8,8 +8,8 @@ bytemuck = "1.7"
 either = "1.6"
 float-ord = "0.3"
 futures = "0.3"
-grid-ray = { git = "https://github.com/bonsairobo/grid-ray-rs", branch = "main" }
-grid-tree = { git = "https://github.com/bonsairobo/grid-tree-rs", branch = "main" }
+grid-ray = { git = "https://github.com/bonsairobo/grid-ray-rs", rev = "21808fea5ce12586c898e5b2adabfe11d75b0291" }
+grid-tree = { git = "https://github.com/bonsairobo/grid-tree-rs", rev = "867bf6ce8bb31d12b76c032b7c9e2811896b2784" }
 itertools = "0.10"
 log = "0.4"
 lz4_flex = "0.9"
