@@ -104,46 +104,7 @@ fn mesh_generator_system(
     mut meshes: ResMut<Assets<Mesh>>,
     mut chunk_meshes: ResMut<ChunkMeshes>,
 ) {
-    let all_chunks =
-        if *cutoff_height == chunk_meshes.used_cutoff {
-            None
-        } else {
-            println!("cutoff new: {} old {}", cutoff_height.0, chunk_meshes.used_cutoff.0);
-            let keys = voxel_map.voxels.get_chunk_keys();
-            Some(DirtyChunks::new(keys.as_slice()))
-        };
-
-    let new_chunk_meshes = generate_mesh_for_each_chunk(
-        &*voxel_map,
-        all_chunks.as_ref().unwrap_or(&*dirty_chunks),
-        &*cutoff_height,
-        &*local_mesh_buffers,
-        &*pool,
-    );
-    chunk_meshes.used_cutoff = *cutoff_height;
-    for (chunk_key, item) in new_chunk_meshes.into_iter() {
-        let old_mesh = if let Some((mesh, material_counts)) = item {
-            log::debug!("Creating chunk mesh for {:?}", chunk_key);
-            chunk_meshes.entities.insert(
-                chunk_key,
-                commands
-                    .spawn_bundle(create_voxel_mesh_bundle(
-                        mesh,
-                        material_counts,
-                        mesh_material.0.clone(),
-                        &mut *meshes,
-                    ))
-                    .insert(ChunkMesh)
-                    .id(),
-            )
-        } else {
-            chunk_meshes.entities.remove(&chunk_key)
-        };
-        if let Some(old_mesh) = old_mesh {
-            log::debug!("Despawning chunk mesh {:?}", old_mesh);
-            commands.entity(old_mesh).despawn();
-        }
-    }
+    
 }
 
 fn generate_mesh_for_each_chunk(
